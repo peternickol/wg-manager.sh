@@ -24,6 +24,54 @@ for power users and hobbyists.
 
 ------------------------------------------------------------------------
 
+## 🚀 Quick Install
+
+### Recommended (download → install → cleanup)
+
+``` bash
+curl -fsSL https://raw.githubusercontent.com/peternickol/wg-manager.sh/master/wg-manager.sh   -o wg-manager.sh && sudo bash wg-manager.sh install && rm wg-manager.sh
+```
+
+------------------------------------------------------------------------
+
+### 🔎 Review Before Installing (Safer)
+
+``` bash
+curl -fsSL https://raw.githubusercontent.com/peternickol/wg-manager.sh/master/wg-manager.sh -o wg-manager.sh
+less wg-manager.sh
+sudo bash wg-manager.sh install
+```
+
+------------------------------------------------------------------------
+
+### ⚡ One-liner (Advanced Users)
+
+``` bash
+curl -fsSL https://raw.githubusercontent.com/peternickol/wg-manager.sh/master/wg-manager.sh |   sudo bash -s -- install
+```
+
+------------------------------------------------------------------------
+
+### 🔁 Force Reinstall
+
+``` bash
+curl -fsSL https://raw.githubusercontent.com/peternickol/wg-manager.sh/master/wg-manager.sh |   sudo bash -s -- install --force
+```
+
+------------------------------------------------------------------------
+
+### 🔒 Version-Pinned Install (Recommended for Stability)
+
+After you begin tagging releases (example: `v1.4.0`), prefer:
+
+``` bash
+curl -fsSL https://raw.githubusercontent.com/peternickol/wg-manager.sh/v1.4.0/wg-manager.sh |   sudo bash -s -- install
+```
+
+This prevents unexpected behavior when `master` changes.
+
+------------------------------------------------------------------------
+
 ## 🧠 Smart Default Interface Resolution
 
 When no interface is specified:
@@ -33,51 +81,6 @@ When no interface is specified:
 -   **Multiple configs** → prompts you to choose (`1.) 2.) 3.) …`)
     -   Works under `sudo` / `sudo-rs` via `/dev/tty`
     -   Non-interactive mode exits safely with an error
-
-This makes:
-
-``` bash
-sudo wg-manager
-```
-
-feel natural even when managing multiple tunnels.
-
-------------------------------------------------------------------------
-
-## 🚀 Installation
-
-### Requirements
-
--   `wg` and `wg-quick`
--   Bash
--   systemd (optional, recommended)
--   `bash-completion` (optional)
--   `qrencode` (optional, for QR support)
-
-Debian / Ubuntu:
-
-``` bash
-sudo apt install wireguard bash-completion
-# optional:
-sudo apt install qrencode
-```
-
-### Install
-
-``` bash
-sudo ./wg-manager.sh install
-```
-
-Default location:
-
-    /usr/local/sbin/wg-manager
-
-Install options:
-
--   `--force`
--   `--no-completion`
--   `--completion-only`
--   `--uninstall-completion`
 
 ------------------------------------------------------------------------
 
@@ -163,7 +166,7 @@ sudo wg-manager show --qr
 
 Requires `qrencode`.
 
-### Show stripped config (wg-quick normalized)
+### Show stripped config
 
 ``` bash
 sudo wg-manager show --strip
@@ -240,8 +243,6 @@ This prevents conflicts with:
 -   Shadowed `/usr/local/bin` utilities
 -   Non-GNU coreutils replacements
 
-It also warns if `/usr/bin/stat` is not GNU coreutils.
-
 ------------------------------------------------------------------------
 
 ## 📄 License
@@ -257,5 +258,4 @@ See the [LICENSE](LICENSE) file for details.
 This is a small wrapper for manual WireGuard management.
 
 It is **not intended for enterprise orchestration or
-infrastructure-as-code**. For those use cases, use Ansible, Terraform,
-or similar tools.
+infrastructure-as-code**.
