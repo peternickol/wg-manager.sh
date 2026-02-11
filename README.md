@@ -197,15 +197,13 @@ sudo wg-manager --check
 sudo wg-manager --check-handshake
 ```
 
-Exit codes:
+## Exit Codes
 
-  Code   Meaning
-  ------ --------------------------------------
-  0      OK
-  2      Must be run as root
-  3      Config missing / ambiguous selection
-  4      Interface down
-  5      Handshake stale or missing
+- **0** — OK  
+- **2** — Must be run as root  
+- **3** — Config missing / ambiguous selection  
+- **4** — Interface down  
+- **5** — Handshake stale or missing  
 
 ------------------------------------------------------------------------
 
