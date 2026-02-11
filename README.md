@@ -26,7 +26,7 @@ for power users and hobbyists.
 
 ## 🚀 Quick Install
 
-### Recommended (download → install → cleanup)
+### Install
 
 ``` bash
 curl -fsSL https://raw.githubusercontent.com/peternickol/wg-manager.sh/master/wg-manager.sh   -o wg-manager.sh && sudo bash wg-manager.sh install && rm wg-manager.sh
@@ -34,41 +34,11 @@ curl -fsSL https://raw.githubusercontent.com/peternickol/wg-manager.sh/master/wg
 
 ------------------------------------------------------------------------
 
-### 🔎 Review Before Installing (Safer)
+### Force Reinstall
 
 ``` bash
-curl -fsSL https://raw.githubusercontent.com/peternickol/wg-manager.sh/master/wg-manager.sh -o wg-manager.sh
-less wg-manager.sh
-sudo bash wg-manager.sh install
+curl -fsSL https://raw.githubusercontent.com/peternickol/wg-manager.sh/master/wg-manager.sh   -o wg-manager.sh && sudo bash wg-manager.sh install --force && rm wg-manager.sh
 ```
-
-------------------------------------------------------------------------
-
-### ⚡ One-liner (Advanced Users)
-
-``` bash
-curl -fsSL https://raw.githubusercontent.com/peternickol/wg-manager.sh/master/wg-manager.sh |   sudo bash -s -- install
-```
-
-------------------------------------------------------------------------
-
-### 🔁 Force Reinstall
-
-``` bash
-curl -fsSL https://raw.githubusercontent.com/peternickol/wg-manager.sh/master/wg-manager.sh |   sudo bash -s -- install --force
-```
-
-------------------------------------------------------------------------
-
-### 🔒 Version-Pinned Install (Recommended for Stability)
-
-After you begin tagging releases (example: `v1.4.0`), prefer:
-
-``` bash
-curl -fsSL https://raw.githubusercontent.com/peternickol/wg-manager.sh/v1.4.0/wg-manager.sh |   sudo bash -s -- install
-```
-
-This prevents unexpected behavior when `master` changes.
 
 ------------------------------------------------------------------------
 
