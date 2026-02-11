@@ -22,6 +22,14 @@ for power users and hobbyists.
 -   Self-install routine with bash completion
 -   PATH sanitization to avoid tool conflicts
 
+## Requirements
+
+- wg / wg-quick
+- root privileges
+- systemd (optional)
+- bash-completion (optional)
+- qrencode (optional, for --qr)
+
 ------------------------------------------------------------------------
 
 ## 🚀 Quick Install
