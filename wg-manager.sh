@@ -33,7 +33,7 @@ set -euo pipefail
 ########################################
 # Configuration
 ########################################
-VERSION="1.4.0"
+VERSION="1.4.1"
 
 WG_CONFIG_DIR="/etc/wireguard"
 HANDSHAKE_MAX_AGE=180   # seconds, used by --check-handshake
@@ -440,7 +440,18 @@ detect_completion_dir() {
 
 install_completion() {
   local dir file
-  dir="$(detect_completion_dir)" || { warn "No bash-completion directory found. Skipping completion install."; return 0; }
+
+  # If bash-completion is not installed, skip gracefully
+  if ! command -v bash >/dev/null 2>&1; then
+    warn "Bash not detected. Skipping completion install."
+    return 0
+  fi
+
+  dir="$(detect_completion_dir)" || {
+    warn "bash-completion not installed. Skipping completion."
+    warn "Install with: sudo apt install bash-completion"
+    return 0
+  }
 
   mkdir -p "$dir" 2>/dev/null || true
   file="$dir/$BASH_COMPLETION_NAME"
@@ -450,17 +461,12 @@ install_completion() {
   fi
 
   log "Installing bash completion → $file"
-  if ! generate_bash_completion | install -m 0644 /dev/stdin "$file"; then
-    if [[ "$dir" != "/etc/bash_completion.d" ]]; then
-      warn "Install failed at $file; retrying in /etc/bash_completion.d"
-      mkdir -p /etc/bash_completion.d 2>/dev/null || true
-      file="/etc/bash_completion.d/$BASH_COMPLETION_NAME"
-      generate_bash_completion | install -m 0644 /dev/stdin "$file"
-    else
-      die "Failed to install bash completion."
-    fi
-  fi
+  generate_bash_completion > "$file" || {
+    warn "Failed to install completion. Skipping."
+    return 0
+  }
 
+  chmod 0644 "$file"
   ok "Bash completion installed."
 }
 
