@@ -6,6 +6,7 @@
 #
 # Purpose:
 #   This tool DOES NOT replace wg-quick. It wraps it to simplify common tasks:
+#     • add/edit configs in nano
 #     • import configs
 #     • list configs
 #     • show configs (with --redact / --qr / --strip)
@@ -23,6 +24,7 @@
 #
 # Notes:
 #   - Imported configs are installed as /etc/wireguard/<iface>.conf with root:root 600
+#   - "add" opens the target config in nano for direct paste/edit workflows
 #   - wg-manager sanitizes PATH when running wg-quick/systemctl:
 #       PATH=/usr/sbin:/usr/bin:/sbin:/bin
 #   - Warns once if /usr/bin/stat is not GNU coreutils (wg-quick assumptions).
@@ -33,7 +35,7 @@ set -euo pipefail
 ########################################
 # Configuration
 ########################################
-VERSION="1.4.1"
+VERSION="1.5.0"
 
 WG_CONFIG_DIR="/etc/wireguard"
 HANDSHAKE_MAX_AGE=180   # seconds, used by --check-handshake
@@ -117,6 +119,7 @@ Core commands:
   list                    List active WireGuard interfaces (wg show interfaces)
 
 Config commands:
+  add [iface]             Open ${WG_CONFIG_DIR}/<iface>.conf in nano (default: ${DEFAULT_INTERFACE_FALLBACK})
   import <file.conf> [iface] [--enable] [--start]
                           Install config into ${WG_CONFIG_DIR}/<iface>.conf (600)
   configs                 List available configs in ${WG_CONFIG_DIR}
@@ -384,7 +387,7 @@ _wg_manager()
   local cur prev words cword
   _init_completion -n : || return
 
-  local commands="toggle up down status list import configs show remove enable disable start stop restart is-enabled is-active journal install uninstall"
+  local commands="toggle up down status list add import configs show remove enable disable start stop restart is-enabled is-active journal install uninstall"
   local opts="--check --check-handshake --quiet --force --help --version --no-completion --completion-only --uninstall-completion -q -f -h -V"
   local show_opts="--redact --qr --strip"
 
@@ -405,7 +408,7 @@ _wg_manager()
   fi
 
   case "${words[1]}" in
-    toggle|up|down|status|enable|disable|start|stop|restart|is-enabled|is-active|journal|remove|show)
+    toggle|up|down|status|enable|disable|start|stop|restart|is-enabled|is-active|journal|remove|show|add)
       COMPREPLY=( $(compgen -W "$ifaces" -- "$cur") )
       ;;
     import)
@@ -665,6 +668,26 @@ cmd_configs() {
   fi
 }
 
+cmd_add() {
+  local iface="${1:-$DEFAULT_INTERFACE_FALLBACK}"
+  local dest
+  dest="$(cfg_path "$iface")"
+
+  have_cmd nano || die "nano not found. Install it first (Debian/Ubuntu): sudo apt-get install nano"
+
+  install -d -m 700 -o root -g root "$WG_CONFIG_DIR"
+  if [[ ! -e "$dest" ]]; then
+    : > "$dest"
+    chown root:root "$dest"
+    chmod 600 "$dest"
+  else
+    chmod 600 "$dest" 2>/dev/null || true
+  fi
+
+  log "Opening $dest in nano"
+  nano "$dest"
+}
+
 cmd_import() {
   local src="${1:-}" iface="${2:-}"
   [[ -n "$src" ]] || die "import requires a source .conf file (e.g. import my.conf)."
@@ -922,7 +945,7 @@ main() {
   fi
 
   case "$1" in
-    toggle|up|down|status|list|import|configs|show|remove|enable|disable|start|stop|restart|is-enabled|is-active|journal|install|uninstall) ;;
+    toggle|up|down|status|list|add|import|configs|show|remove|enable|disable|start|stop|restart|is-enabled|is-active|journal|install|uninstall) ;;
     *) cmd_toggle "$1"; exit 0 ;;
   esac
 
@@ -932,6 +955,7 @@ main() {
     down)     cmd_down   "${2:-}" ;;
     status)   cmd_status "${2:-}" ;;
     list)     cmd_list ;;
+    add)      cmd_add    "${2:-}" ;;
     configs)  cmd_configs ;;
     remove)   cmd_remove "${2:-}" ;;
 
