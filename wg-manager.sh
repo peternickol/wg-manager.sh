@@ -6,7 +6,8 @@
 #
 # Purpose:
 #   This tool DOES NOT replace wg-quick. It wraps it to simplify common tasks:
-#     • add/edit configs in nano
+#     • setup Debian/Ubuntu prerequisites
+#     • edit configs in nano
 #     • import configs
 #     • list configs
 #     • show configs (with --redact / --qr / --strip)
@@ -24,7 +25,7 @@
 #
 # Notes:
 #   - Imported configs are installed as /etc/wireguard/<iface>.conf with root:root 600
-#   - "add" opens the target config in nano for direct paste/edit workflows
+#   - "edit" opens the target config in nano for direct paste/edit workflows
 #   - wg-manager sanitizes PATH when running wg-quick/systemctl:
 #       PATH=/usr/sbin:/usr/bin:/sbin:/bin
 #   - Warns once if /usr/bin/stat is not GNU coreutils (wg-quick assumptions).
@@ -35,7 +36,7 @@ set -euo pipefail
 ########################################
 # Configuration
 ########################################
-VERSION="1.5.0"
+VERSION="1.6.0"
 
 WG_CONFIG_DIR="/etc/wireguard"
 HANDSHAKE_MAX_AGE=180   # seconds, used by --check-handshake
@@ -119,13 +120,17 @@ Core commands:
   list                    List active WireGuard interfaces (wg show interfaces)
 
 Config commands:
-  add [iface]             Open ${WG_CONFIG_DIR}/<iface>.conf in nano (default: ${DEFAULT_INTERFACE_FALLBACK})
+  edit [conf-name]        Open ${WG_CONFIG_DIR}/<conf-name>.conf in nano (default: ${DEFAULT_INTERFACE_FALLBACK})
+  add [conf-name]         Compatibility alias for "edit"
   import <file.conf> [iface] [--enable] [--start]
                           Install config into ${WG_CONFIG_DIR}/<iface>.conf (600)
   configs                 List available configs in ${WG_CONFIG_DIR}
   show [iface] [--redact] [--qr] [--strip]
                           Display config (optionally redacted, as QR, or stripped via wg-quick)
   remove <iface>          Remove config (disables systemd unit first). Refuses if active unless --force
+
+Setup commands:
+  setup                   Install WireGuard prerequisites on Ubuntu/Debian
 
 Systemd commands (wg-quick@.service):
   enable [iface]          systemctl enable wg-quick@<iface>
@@ -185,6 +190,13 @@ require_root() {
 cfg_path() { echo "${WG_CONFIG_DIR}/$1.conf"; }
 unit_name() { echo "wg-quick@$1"; }
 have_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+normalize_iface_name() {
+  local raw="${1:-}"
+  raw="${raw##*/}"
+  raw="${raw%.conf}"
+  printf '%s' "$raw"
+}
 
 has_systemd() {
   command -v systemctl >/dev/null 2>&1 && systemctl --version >/dev/null 2>&1
@@ -387,7 +399,7 @@ _wg_manager()
   local cur prev words cword
   _init_completion -n : || return
 
-  local commands="toggle up down status list add import configs show remove enable disable start stop restart is-enabled is-active journal install uninstall"
+  local commands="toggle up down status list edit add import configs show remove enable disable start stop restart is-enabled is-active journal setup install uninstall"
   local opts="--check --check-handshake --quiet --force --help --version --no-completion --completion-only --uninstall-completion -q -f -h -V"
   local show_opts="--redact --qr --strip"
 
@@ -408,7 +420,7 @@ _wg_manager()
   fi
 
   case "${words[1]}" in
-    toggle|up|down|status|enable|disable|start|stop|restart|is-enabled|is-active|journal|remove|show|add)
+    toggle|up|down|status|enable|disable|start|stop|restart|is-enabled|is-active|journal|remove|show|edit|add)
       COMPREPLY=( $(compgen -W "$ifaces" -- "$cur") )
       ;;
     import)
@@ -543,6 +555,38 @@ cmd_uninstall() {
   ok "Removed: $dest"
 }
 
+cmd_setup() {
+  [[ -f /etc/debian_version ]] || die "setup currently supports Ubuntu/Debian only."
+
+  local packages=(
+    wireguard
+    wireguard-tools
+    openresolv
+    nano
+  )
+  local missing=()
+  local package
+
+  for package in "${packages[@]}"; do
+    if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
+      missing+=("$package")
+    fi
+  done
+
+  if [[ "${#missing[@]}" -eq 0 ]]; then
+    ok "WireGuard prerequisites already installed."
+  else
+    log "Installing prerequisites: ${missing[*]}"
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y "${missing[@]}"
+    ok "Installed prerequisites: ${missing[*]}"
+  fi
+
+  install -d -m 700 -o root -g root "$WG_CONFIG_DIR"
+  ok "Prepared config directory: $WG_CONFIG_DIR"
+}
+
 ########################################
 # Core wg-quick wrappers
 ########################################
@@ -668,9 +712,11 @@ cmd_configs() {
   fi
 }
 
-cmd_add() {
-  local iface="${1:-$DEFAULT_INTERFACE_FALLBACK}"
-  local dest
+cmd_edit() {
+  local iface_raw="${1:-$DEFAULT_INTERFACE_FALLBACK}"
+  local iface dest
+  iface="$(normalize_iface_name "$iface_raw")"
+  [[ -n "$iface" ]] || die "edit requires a config name."
   dest="$(cfg_path "$iface")"
 
   have_cmd nano || die "nano not found. Install it first (Debian/Ubuntu): sudo apt-get install nano"
@@ -686,6 +732,10 @@ cmd_add() {
 
   log "Opening $dest in nano"
   nano "$dest"
+}
+
+cmd_add() {
+  cmd_edit "${1:-}"
 }
 
 cmd_import() {
@@ -945,7 +995,7 @@ main() {
   fi
 
   case "$1" in
-    toggle|up|down|status|list|add|import|configs|show|remove|enable|disable|start|stop|restart|is-enabled|is-active|journal|install|uninstall) ;;
+    toggle|up|down|status|list|edit|add|import|configs|show|remove|enable|disable|start|stop|restart|is-enabled|is-active|journal|setup|install|uninstall) ;;
     *) cmd_toggle "$1"; exit 0 ;;
   esac
 
@@ -955,6 +1005,7 @@ main() {
     down)     cmd_down   "${2:-}" ;;
     status)   cmd_status "${2:-}" ;;
     list)     cmd_list ;;
+    edit)     cmd_edit   "${2:-}" ;;
     add)      cmd_add    "${2:-}" ;;
     configs)  cmd_configs ;;
     remove)   cmd_remove "${2:-}" ;;
@@ -968,6 +1019,7 @@ main() {
     is-active)  cmd_is_active  "${2:-}" ;;
     journal)    cmd_journal    "${2:-}" ;;
 
+    setup)      cmd_setup ;;
     install)    cmd_install ;;
     uninstall)  cmd_uninstall ;;
 

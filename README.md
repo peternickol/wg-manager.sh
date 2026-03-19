@@ -3,8 +3,8 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 `wg-manager` is a lightweight convenience wrapper around **wg-quick**
-that simplifies everyday WireGuard management --- without replacing
-native tooling.
+that simplifies everyday WireGuard management without replacing native
+tooling.
 
 It keeps `wg-quick` as the engine and provides a cleaner CLI workflow
 for power users and hobbyists.
@@ -14,6 +14,8 @@ for power users and hobbyists.
 ## ✨ Features
 
 -   Smart default interface resolution
+-   Debian/Ubuntu setup helper for WireGuard prerequisites
+-   Edit configs directly in `/etc/wireguard` with `nano`
 -   Import configs safely into `/etc/wireguard`
 -   List, show, redact, strip, and QR-export configs
 -   Remove configs safely (with active protection)
@@ -24,7 +26,6 @@ for power users and hobbyists.
 
 ## Requirements
 
-- wg / wg-quick
 - root privileges
 - systemd (optional)
 - bash-completion (optional)
@@ -48,6 +49,25 @@ curl -fsSL https://raw.githubusercontent.com/peternickol/wg-manager.sh/master/wg
 curl -fsSL https://raw.githubusercontent.com/peternickol/wg-manager.sh/master/wg-manager.sh   -o wg-manager.sh && sudo bash wg-manager.sh install --force && rm wg-manager.sh
 ```
 
+### Debian / Ubuntu Setup
+
+To prepare a normal Debian or Ubuntu machine for WireGuard management:
+
+``` bash
+sudo wg-manager setup
+```
+
+This installs the common local prerequisites:
+
+- `wireguard`
+- `wireguard-tools`
+- `openresolv`
+- `nano`
+
+and prepares:
+
+- `/etc/wireguard`
+
 ------------------------------------------------------------------------
 
 ## 🧠 Smart Default Interface Resolution
@@ -69,6 +89,12 @@ When no interface is specified:
 ``` bash
 sudo wg-manager
 sudo wg-manager wg1
+```
+
+### Setup a machine for WireGuard
+
+``` bash
+sudo wg-manager setup
 ```
 
 ### Up / Down
@@ -94,6 +120,29 @@ sudo wg-manager list
 
 ``` bash
 sudo wg-manager configs
+```
+
+### Edit or create a config in `nano`
+
+``` bash
+sudo wg-manager edit
+sudo wg-manager edit wg1
+sudo wg-manager edit branch-office
+```
+
+`edit` opens:
+
+    /etc/wireguard/<name>.conf
+
+If the file does not exist yet, it is created first with `root:root 600`.
+
+### Compatibility alias
+
+`add` is still accepted as an alias for `edit`:
+
+``` bash
+sudo wg-manager add wg1
+sudo wg-manager add branch-office.conf
 ```
 
 ------------------------------------------------------------------------
