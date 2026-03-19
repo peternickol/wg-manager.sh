@@ -300,6 +300,22 @@ check_config_readable() {
   fi
 }
 
+config_has_dns() {
+  local cfg="$1"
+  grep -Eq '^[[:space:]]*DNS[[:space:]]*=' "$cfg"
+}
+
+warn_if_config_has_dns() {
+  local iface="$1" cfg
+  cfg="$(cfg_path "$iface")"
+  [[ -r "$cfg" ]] || return 0
+  if config_has_dns "$cfg"; then
+    warn "Config $cfg contains a DNS= line."
+    warn "This can break split-tunnel clients if that resolver is not reachable through the tunnel."
+    warn "Review with: wg-manager edit $iface"
+  fi
+}
+
 validate_conf_file() {
   local src="$1"
   [[ -f "$src" ]] || { printf '%sError: %s is not a file.%s\n' "$C_ERR" "$src" "$C_RESET" >&2; exit 3; }
@@ -594,6 +610,7 @@ cmd_up() {
   local iface
   iface="$(get_interface "${1:-}")"
   check_config_readable "$iface"
+  warn_if_config_has_dns "$iface"
   log "Bringing up $iface..."
   run_wgquick up "$iface"
   ok "$iface is now UP"
@@ -614,6 +631,7 @@ cmd_toggle() {
   [[ -n "$iface" ]] || die "No interface selected."
 
   check_config_readable "$iface"
+  warn_if_config_has_dns "$iface"
 
   if is_up "$iface"; then
     log "$iface is UP → bringing DOWN"
@@ -758,6 +776,10 @@ cmd_import() {
   log "Importing $src → $dest"
   install -m 600 -o root -g root "$src" "$dest"
   ok "Installed config: $dest (root:root, 600)"
+  if config_has_dns "$dest"; then
+    warn "Imported config contains a DNS= line."
+    warn "This can break split-tunnel clients if that resolver is not reachable through the tunnel."
+  fi
 
   if have_cmd wg-quick; then
     if ! wg-quick strip "$iface" >/dev/null 2>&1; then
@@ -882,6 +904,7 @@ cmd_start() {
   local iface
   iface="$(get_interface "${1:-}")"
   check_config_readable "$iface"
+  warn_if_config_has_dns "$iface"
   if has_systemd; then
     log "Starting $(unit_name "$iface")..."
     run_systemctl start "$(unit_name "$iface")"
@@ -909,6 +932,7 @@ cmd_restart() {
   local iface
   iface="$(get_interface "${1:-}")"
   check_config_readable "$iface"
+  warn_if_config_has_dns "$iface"
   if has_systemd; then
     log "Restarting $(unit_name "$iface")..."
     run_systemctl restart "$(unit_name "$iface")"
