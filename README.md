@@ -9,6 +9,10 @@ tooling.
 It keeps `wg-quick` as the engine and provides a cleaner CLI workflow
 for power users and hobbyists.
 
+The installer places the launcher at:
+
+- `/usr/local/bin/wg-manager`
+
 ------------------------------------------------------------------------
 
 ## ✨ Features

@@ -44,7 +44,7 @@ HANDSHAKE_MAX_AGE=180   # seconds, used by --check-handshake
 # If no configs exist, default to this interface name:
 DEFAULT_INTERFACE_FALLBACK="wg0"
 
-INSTALL_PATH="/usr/local/sbin/wg-manager"
+INSTALL_PATH="/usr/local/bin/wg-manager"
 BASH_COMPLETION_NAME="wg-manager"
 ########################################
 
