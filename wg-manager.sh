@@ -46,6 +46,7 @@ DEFAULT_INTERFACE_FALLBACK="wg0"
 
 INSTALL_PATH="/usr/local/bin/wg-manager"
 BASH_COMPLETION_NAME="wg-manager"
+UPDATE_URL="https://raw.githubusercontent.com/peternickol/wg-manager.sh/master/wg-manager.sh"
 ########################################
 
 SCRIPT_NAME="$(basename "$0")"
@@ -145,6 +146,7 @@ Systemd commands (wg-quick@.service):
 
 Install commands:
   install                 Install script to: ${INSTALL_PATH}
+  update                  Download latest script from GitHub and install it to: ${INSTALL_PATH}
   uninstall               Remove installed script at: ${INSTALL_PATH}
 
 Global options:
@@ -159,7 +161,7 @@ Health checks:
                           Like --check, but fails with 5 if handshake stale/missing
 
 Install options:
-  --no-completion         Install binary only (skip bash completion)
+  --no-completion         Install/update binary only (skip bash completion)
   --completion-only       Install bash completion only
   --uninstall-completion  Remove installed bash completion
 
@@ -559,6 +561,46 @@ cmd_install() {
   fi
 
   log "Installation complete. Try: sudo wg-manager --version"
+}
+
+download_update_source() {
+  local dest="$1"
+
+  if have_cmd curl; then
+    curl -fsSL "$UPDATE_URL" -o "$dest"
+    return 0
+  fi
+
+  if have_cmd wget; then
+    wget -qO "$dest" "$UPDATE_URL"
+    return 0
+  fi
+
+  die "Neither curl nor wget is installed. Install one of them to use update."
+}
+
+cmd_update() {
+  local tmp
+  tmp="$(mktemp "${TMPDIR:-/tmp}/wg-manager.update.XXXXXX")"
+  trap 'rm -f "$tmp"' RETURN
+
+  log "Downloading latest wg-manager from $UPDATE_URL"
+  download_update_source "$tmp"
+  [[ -s "$tmp" ]] || die "Downloaded update is empty."
+
+  bash -n "$tmp" || die "Downloaded update failed syntax check."
+
+  log "Installing update → $INSTALL_PATH"
+  install -m 0755 -o root -g root "$tmp" "$INSTALL_PATH"
+  ok "Updated binary: $INSTALL_PATH"
+
+  if [[ "$NO_COMPLETION" -eq 0 ]]; then
+    install_completion
+  else
+    log "Skipping completion installation (--no-completion)."
+  fi
+
+  log "Update complete. Try: sudo wg-manager --version"
 }
 
 cmd_uninstall() {
@@ -1020,7 +1062,7 @@ main() {
   fi
 
   case "$1" in
-    toggle|up|down|status|list|edit|add|import|configs|show|remove|enable|disable|start|stop|restart|is-enabled|is-active|journal|setup|install|uninstall) ;;
+    toggle|up|down|status|list|edit|add|import|configs|show|remove|enable|disable|start|stop|restart|is-enabled|is-active|journal|setup|install|update|uninstall) ;;
     *) cmd_toggle "$1"; exit 0 ;;
   esac
 
@@ -1046,6 +1088,7 @@ main() {
 
     setup)      cmd_setup ;;
     install)    cmd_install ;;
+    update)     cmd_update ;;
     uninstall)  cmd_uninstall ;;
 
     import)
