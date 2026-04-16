@@ -120,7 +120,8 @@ Core commands:
   list                    List active WireGuard interfaces (wg show interfaces)
 
 Config commands:
-  edit [conf-name]        Open ${WG_CONFIG_DIR}/<conf-name>.conf in nano (default: ${DEFAULT_INTERFACE_FALLBACK})
+  edit [conf-name]        Open ${WG_CONFIG_DIR}/<conf-name>.conf in nano
+                          Default: auto-resolved iface, or ${DEFAULT_INTERFACE_FALLBACK} if none exist
   add [conf-name]         Compatibility alias for "edit"
   import <file.conf> [iface] [--enable] [--start]
                           Install config into ${WG_CONFIG_DIR}/<iface>.conf (600)
@@ -731,9 +732,9 @@ cmd_configs() {
 }
 
 cmd_edit() {
-  local iface_raw="${1:-$DEFAULT_INTERFACE_FALLBACK}"
   local iface dest
-  iface="$(normalize_iface_name "$iface_raw")"
+  iface="$(get_interface "${1:-}")"
+  iface="$(normalize_iface_name "$iface")"
   [[ -n "$iface" ]] || die "edit requires a config name."
   dest="$(cfg_path "$iface")"
 
