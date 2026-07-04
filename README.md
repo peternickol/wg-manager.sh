@@ -142,7 +142,7 @@ It installs:
 
 - `wireguard`
 - `wireguard-tools`
-- `openresolv`
+- a `resolvconf` provider (`openresolv` when available, otherwise `resolvconf`)
 - `nano`
 
 It also prepares:

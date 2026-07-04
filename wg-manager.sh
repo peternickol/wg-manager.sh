@@ -36,7 +36,7 @@ set -euo pipefail
 ########################################
 # Configuration
 ########################################
-VERSION="1.6.0"
+VERSION="1.6.1"
 
 WG_CONFIG_DIR="/etc/wireguard"
 HANDSHAKE_MAX_AGE=180   # seconds, used by --check-handshake
@@ -620,11 +620,12 @@ cmd_setup() {
   local packages=(
     wireguard
     wireguard-tools
-    openresolv
     nano
   )
   local missing=()
   local package
+  local resolver_package=""
+  local install_packages=()
 
   for package in "${packages[@]}"; do
     if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
@@ -632,14 +633,44 @@ cmd_setup() {
     fi
   done
 
+  if ! have_cmd resolvconf; then
+    missing+=("__resolvconf_provider__")
+  fi
+
   if [[ "${#missing[@]}" -eq 0 ]]; then
     ok "WireGuard prerequisites already installed."
   else
-    log "Installing prerequisites: ${missing[*]}"
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
-    apt-get install -y "${missing[@]}"
-    ok "Installed prerequisites: ${missing[*]}"
+
+    if [[ " ${missing[*]} " == *" __resolvconf_provider__ "* ]]; then
+      for package in openresolv resolvconf; do
+        if apt-cache policy "$package" 2>/dev/null | grep -q "Candidate: [^(]"; then
+          resolver_package="$package"
+          break
+        fi
+      done
+
+      if [[ -n "$resolver_package" ]]; then
+        missing+=("$resolver_package")
+      else
+        warn "No resolvconf provider package is available (tried openresolv, resolvconf)."
+        warn "WireGuard will install, but configs with DNS= may need resolvconf or system DNS setup."
+      fi
+    fi
+
+    for package in "${missing[@]}"; do
+      [[ "$package" != "__resolvconf_provider__" ]] || continue
+      install_packages+=("$package")
+    done
+
+    if [[ "${#install_packages[@]}" -gt 0 ]]; then
+      log "Installing prerequisites: ${install_packages[*]}"
+      apt-get install -y "${install_packages[@]}"
+      ok "Installed prerequisites: ${install_packages[*]}"
+    else
+      ok "WireGuard prerequisites already installed."
+    fi
   fi
 
   install -d -m 700 -o root -g root "$WG_CONFIG_DIR"
