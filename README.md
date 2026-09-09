@@ -2,8 +2,8 @@
 
 `wg-manager` is a bash-first convenience wrapper around `wg-quick`.
 
-It is meant to keep common WireGuard tasks simple on a normal Debian or Ubuntu
-machine without replacing the native tools underneath.
+It is meant to keep common WireGuard tasks simple on Debian, Ubuntu, Arch Linux,
+and Omarchy without replacing the native tools underneath.
 
 The installed launcher path is:
 
@@ -27,8 +27,12 @@ This project currently targets:
 
 - Debian
 - Ubuntu
+- Arch Linux
+- Omarchy
 
-The setup flow assumes `apt-get` and Debian-style package names.
+Setup detects the distribution from `/etc/os-release`. It uses `apt-get` on
+Debian/Ubuntu, `omarchy pkg add` on Omarchy, and `pacman` on Arch Linux (or when
+the Omarchy command is unavailable).
 
 ## Quick Install
 
@@ -136,14 +140,26 @@ sudo wg-manager update --no-completion
 
 ## Setup
 
-`wg-manager setup` prepares a Debian or Ubuntu machine for WireGuard use.
+`wg-manager setup` prepares a supported machine for WireGuard use and skips
+packages that are already installed.
 
-It installs:
+On Debian/Ubuntu, it installs:
 
 - `wireguard`
 - `wireguard-tools`
 - a `resolvconf` provider (`openresolv` when available, otherwise `resolvconf`)
 - `nano`
+
+On Arch Linux/Omarchy, it installs:
+
+- `wireguard-tools` (provides both `wg` and `wg-quick`)
+- `nano`
+- a `resolvconf` provider if the command is missing: `systemd-resolvconf` when
+  `systemd-resolved` is active (the standard Omarchy setup), otherwise `openresolv`
+
+Existing DNS providers are preserved. Setup does not change `/etc/resolv.conf`
+or enable/restart network services. Arch package installation uses the existing
+package databases; it does not refresh them or run a system upgrade.
 
 It also prepares:
 
@@ -153,6 +169,13 @@ Example:
 
 ```bash
 sudo wg-manager setup
+```
+
+On Omarchy, optional QR export and Bash completion dependencies can be installed
+with:
+
+```bash
+omarchy pkg add qrencode bash-completion
 ```
 
 ## Command Reference
@@ -294,6 +317,17 @@ Exit codes:
 - systemd for systemd-specific commands
 - bash-completion for completion install support
 - qrencode for `show --qr`
+
+## Development
+
+Run the setup regression tests with Python 3 and Bash:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+The tests mock package installation, service queries, and privileged directory
+creation; they do not require root or change the host's network configuration.
 
 ## License
 

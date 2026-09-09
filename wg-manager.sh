@@ -6,7 +6,7 @@
 #
 # Purpose:
 #   This tool DOES NOT replace wg-quick. It wraps it to simplify common tasks:
-#     • setup Debian/Ubuntu prerequisites
+#     • setup Debian/Ubuntu/Arch Linux/Omarchy prerequisites
 #     • edit configs in nano
 #     • import configs
 #     • list configs
@@ -36,7 +36,7 @@ set -euo pipefail
 ########################################
 # Configuration
 ########################################
-VERSION="1.6.1"
+VERSION="1.7.0"
 
 WG_CONFIG_DIR="/etc/wireguard"
 HANDSHAKE_MAX_AGE=180   # seconds, used by --check-handshake
@@ -90,9 +90,9 @@ else
   C_RESET="" C_INFO="" C_OK="" C_WARN="" C_ERR=""
 fi
 
-log()  { [[ "$QUIET" -eq 0 ]] && printf '%s%s%s\n' "$C_INFO" "$*" "$C_RESET"; }
-ok()   { [[ "$QUIET" -eq 0 ]] && printf '%s%s%s\n' "$C_OK"   "$*" "$C_RESET"; }
-warn() { [[ "$QUIET" -eq 0 ]] && printf '%s%s%s\n' "$C_WARN" "$*" "$C_RESET" >&2; }
+log()  { if [[ "$QUIET" -eq 0 ]]; then printf '%s%s%s\n' "$C_INFO" "$*" "$C_RESET"; fi; }
+ok()   { if [[ "$QUIET" -eq 0 ]]; then printf '%s%s%s\n' "$C_OK"   "$*" "$C_RESET"; fi; }
+warn() { if [[ "$QUIET" -eq 0 ]]; then printf '%s%s%s\n' "$C_WARN" "$*" "$C_RESET" >&2; fi; }
 die()  { printf '%sError: %s%s\n' "$C_ERR" "$*" "$C_RESET" >&2; exit 1; }
 
 show_version() {
@@ -132,7 +132,7 @@ Config commands:
   remove <iface>          Remove config (disables systemd unit first). Refuses if active unless --force
 
 Setup commands:
-  setup                   Install WireGuard prerequisites on Ubuntu/Debian
+  setup                   Install WireGuard prerequisites on Debian/Ubuntu/Arch Linux/Omarchy
 
 Systemd commands (wg-quick@.service):
   enable [iface]          systemctl enable wg-quick@<iface>
@@ -193,6 +193,53 @@ require_root() {
 cfg_path() { echo "${WG_CONFIG_DIR}/$1.conf"; }
 unit_name() { echo "wg-quick@$1"; }
 have_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+detect_platform() {
+  local os_release="${1:-/etc/os-release}"
+  local ID="" ID_LIKE=""
+
+  if [[ $# -eq 0 && ! -r "$os_release" ]]; then
+    os_release="/usr/lib/os-release"
+  fi
+  if [[ -r "$os_release" ]]; then
+    # os-release is a system-owned file containing shell-compatible assignments.
+    # shellcheck disable=SC1090
+    . "$os_release"
+  fi
+
+  case "$ID" in
+    omarchy) echo omarchy ;;
+    arch)
+      # Older Omarchy installations identify themselves as Arch Linux.
+      if have_cmd omarchy; then echo omarchy; else echo arch; fi
+      ;;
+    debian|ubuntu) echo debian ;;
+    *)
+      case " $ID_LIKE " in
+        *" arch "*)
+          if have_cmd omarchy; then echo omarchy; else echo arch; fi
+          ;;
+        *" debian "*) echo debian ;;
+        *) echo unsupported ;;
+      esac
+      ;;
+  esac
+}
+
+package_install_hint() {
+  case "$(detect_platform)" in
+    omarchy)
+      if have_cmd omarchy; then
+        printf 'omarchy pkg add %s' "$*"
+      else
+        printf 'sudo pacman -S --needed %s' "$*"
+      fi
+      ;;
+    arch) printf 'sudo pacman -S --needed %s' "$*" ;;
+    debian) printf 'sudo apt-get install %s' "$*" ;;
+    *) printf "install %s with your distribution's package manager" "$*" ;;
+  esac
+}
 
 normalize_iface_name() {
   local raw="${1:-}"
@@ -360,7 +407,7 @@ warn_if_non_gnu_stat() {
   if [[ "$ver" != *"GNU coreutils"* ]]; then
     warn "Non-GNU stat detected: $ver"
     warn "wg-quick expects GNU coreutils behavior; you may see permission-check errors."
-    warn "Tip (Ubuntu/Debian): sudo apt-get install --reinstall coreutils"
+    warn "Reinstall GNU coreutils using your distribution's package manager."
   fi
 }
 
@@ -370,7 +417,7 @@ redact_privatekey_stream() {
 
 print_config_as_qr() {
   if ! have_cmd qrencode; then
-    die "qrencode not found. Install it (Debian/Ubuntu): sudo apt-get install qrencode"
+    die "qrencode not found. Install it with: $(package_install_hint qrencode)"
   fi
   if qrencode -t ANSIUTF8 -o - >/dev/null 2>&1 <<<"test"; then
     qrencode -t ANSIUTF8 -o -
@@ -483,7 +530,7 @@ install_completion() {
 
   dir="$(detect_completion_dir)" || {
     warn "bash-completion not installed. Skipping completion."
-    warn "Install with: sudo apt install bash-completion"
+    warn "Install with: $(package_install_hint bash-completion)"
     return 0
   }
 
@@ -614,9 +661,9 @@ cmd_uninstall() {
   ok "Removed: $dest"
 }
 
-cmd_setup() {
-  [[ -f /etc/debian_version ]] || die "setup currently supports Ubuntu/Debian only."
-
+setup_debian_prerequisites() {
+  have_cmd apt-get && have_cmd apt-cache && have_cmd dpkg-query \
+    || die "setup requires apt-get, apt-cache, and dpkg-query on Debian/Ubuntu."
   local packages=(
     wireguard
     wireguard-tools
@@ -672,6 +719,55 @@ cmd_setup() {
       ok "WireGuard prerequisites already installed."
     fi
   fi
+}
+
+setup_arch_prerequisites() {
+  local platform="$1"
+  have_cmd pacman || die "setup requires pacman on Arch Linux/Omarchy."
+
+  local packages=(wireguard-tools nano)
+  local missing=()
+  local package
+
+  # Keep an existing provider. Otherwise, match the active DNS service without
+  # changing resolv.conf or enabling/restarting any networking services.
+  if ! have_cmd resolvconf; then
+    if have_cmd systemctl && systemctl is-active --quiet systemd-resolved; then
+      packages+=(systemd-resolvconf)
+    else
+      packages+=(openresolv)
+    fi
+  fi
+
+  for package in "${packages[@]}"; do
+    if ! pacman -Q "$package" >/dev/null 2>&1; then
+      missing+=("$package")
+    fi
+  done
+
+  if [[ "${#missing[@]}" -eq 0 ]]; then
+    ok "WireGuard prerequisites already installed."
+    return 0
+  fi
+
+  log "Installing prerequisites: ${missing[*]}"
+  if [[ "$platform" == "omarchy" ]] && have_cmd omarchy; then
+    omarchy pkg add "${missing[@]}"
+  else
+    # Use the existing package databases; a refresh alone risks a partial upgrade.
+    pacman -S --needed --noconfirm "${missing[@]}"
+  fi
+  ok "Installed prerequisites: ${missing[*]}"
+}
+
+cmd_setup() {
+  local platform
+  platform="$(detect_platform)"
+  case "$platform" in
+    debian) setup_debian_prerequisites ;;
+    arch|omarchy) setup_arch_prerequisites "$platform" ;;
+    *) die "setup supports Debian, Ubuntu, Arch Linux, and Omarchy." ;;
+  esac
 
   install -d -m 700 -o root -g root "$WG_CONFIG_DIR"
   ok "Prepared config directory: $WG_CONFIG_DIR"
@@ -811,7 +907,7 @@ cmd_edit() {
   [[ -n "$iface" ]] || die "edit requires a config name."
   dest="$(cfg_path "$iface")"
 
-  have_cmd nano || die "nano not found. Install it first (Debian/Ubuntu): sudo apt-get install nano"
+  have_cmd nano || die "nano not found. Install it with: $(package_install_hint nano)"
 
   install -d -m 700 -o root -g root "$WG_CONFIG_DIR"
   if [[ ! -e "$dest" ]]; then
@@ -1179,4 +1275,6 @@ main() {
   esac
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
