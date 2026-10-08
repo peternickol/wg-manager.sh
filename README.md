@@ -1,4 +1,8 @@
-# wg-manager
+<p align="center">
+  <img src="docs/wg-manager-logo.png" alt="wg-manager logo: a red dragon on a shield beside a settings gear" width="160">
+</p>
+
+<h1 align="center">wg-manager</h1>
 
 `wg-manager` is a bash-first convenience wrapper around `wg-quick`.
 
